@@ -1,4 +1,4 @@
-# elk-stack-dockercompose
+# ELK-LARAVEL
 By this you can make your elk stack in one command
 
 Just Pull this via
@@ -25,3 +25,11 @@ All container should be running
 Now check your browser : localhost:port
 
 Note: Port which I have mentioned in yml file..... I am not telling your so that you will explore it or ask me in comment.
+
+# LARAVEL
+composer require elasticsearch/elasticsearch
+composer require ruflin/Elastica
+composer require laravel/scout
+
+docker-compose run --rm composer require nyholm/psr7
+docker-compose run --rm composer require symfony/psr-http-message-bridge 

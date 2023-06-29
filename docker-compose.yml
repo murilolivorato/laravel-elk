@@ -2,9 +2,118 @@
 # ELK configuration 
 # Last edit: 18/may/2022
 
-version: '3.5'
+version: '3.9'
+
+networks:
+  #logging-net:
+  elk_laravel:
 
 services:
+  server:
+    # image: 'nginx:stable-alpine'
+    build:
+      context: .
+      dockerfile: dockerfiles/nginx.dockerfile
+    ports:
+      - 8080:80
+      # - 443:443
+    volumes:
+      - ./src:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - php
+      - redis
+      - mysql
+      - mailhog
+      - elasticsearch
+      - logstash
+      - kibana
+    container_name: elk_server
+    networks:
+      - elk_laravel
+    # extra_hosts:
+    #  - "host.docker.internal:host-gateway"
+
+  php:
+    build:
+      context: .
+      dockerfile: dockerfiles/php.dockerfile
+    volumes:
+      - ./src:/var/www/html:delegated
+    container_name: php
+    networks:
+      - elk_laravel
+
+  mysql:
+    image: mysql:8.0.1
+    restart: unless-stopped
+    tty: true
+    container_name: mysql
+    ports:
+      - 4306:3306
+    env_file:
+      - ./mysql/.env
+    networks:
+      - elk_laravel
+    volumes:
+      - /opt/mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+    networks:
+      - elk_laravel
+
+  composer:
+    build:
+      context: ./dockerfiles
+      dockerfile: composer.dockerfile
+    volumes:
+      - ./src:/var/www/html
+    depends_on:
+      - php
+    networks:
+      - elk_laravel
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    restart: always
+    container_name: phpmyadmin
+    depends_on:
+      - mysql
+    ports:
+      - '8890:80'
+    environment:
+      - PMA_HOST=mysql
+      - PMA_USER=root
+      - PMA_PASSWORD=secret
+    networks:
+      - elk_laravel
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    ports:
+      - 1025:1025
+      - 8025:8025
+    networks:
+      - elk_laravel
+
+  artisan:
+    build:
+      context: .
+      dockerfile: dockerfiles/php.dockerfile
+    volumes:
+      - ./src:/var/www/html
+    entrypoint: ["php", "/var/www/html/artisan"]
+    depends_on:
+      - mysql
+    networks:
+      - elk_laravel
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.15.0
     volumes:
@@ -24,9 +133,10 @@ services:
       discovery.type: single-node
       # Publish host force to 'elk' network overlay
       network.publish_host: _eth0_
+    restart: unless-stopped
     networks:
-      - elk
-      
+      - elk_laravel
+
   logstash:
     image: docker.elastic.co/logstash/logstash:7.15.0
     volumes:
@@ -45,11 +155,11 @@ services:
     environment:
       LS_JAVA_OPTS: "-Xmx256m -Xms256m"
     networks:
-      - elk
-      - logging-net
+      - elk_laravel
+      #- logging-net
     depends_on:
       - elasticsearch
-      
+
   kibana:
     image: docker.elastic.co/kibana/kibana:7.15.0
     volumes:
@@ -59,10 +169,10 @@ services:
     ports:
       - "7601:5601"
     networks:
-      - elk
+      - elk_laravel
     depends_on:
       - elasticsearch
-    
+
   # ElastAlert 2 service
   # elastalert:
   #   image: jertel/elastalert2
@@ -74,9 +184,6 @@ services:
   #   depends_on:
   #     - elasticsearch
 
-networks:
-  logging-net:
-  elk:
 
 volumes:
   elasticsearch:
